@@ -1,0 +1,33 @@
+FROM php:8.2-cli
+USER root
+RUN apt -yqq update && apt -yqq install libmcrypt-dev default-mysql-client \
+    && docker-php-ext-install pdo_mysql pcntl
+
+RUN apt -yqq install build-essential libssl-dev zlib1g-dev libpng-dev libjpeg-dev libfreetype6-dev
+
+RUN apt -yqq install zip unzip libzip-dev && docker-php-ext-install zip
+
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/bin --filename=composer --quiet
+
+ENV COMPOSER_ALLOW_SUPERUSER 1
+
+RUN docker-php-ext-configure gd --with-freetype=/usr/include/ --with-jpeg=/usr/include/ \
+    && docker-php-ext-install gd
+
+
+#Intl
+RUN apt -yqq install libicu-dev g++
+RUN docker-php-ext-configure intl && docker-php-ext-install intl
+
+#Sockets
+RUN docker-php-ext-install sockets
+
+#crontab setup
+RUN apt -yqq install cron
+COPY cronjob /etc/cron.d/yii
+RUN chmod 0600 /etc/cron.d/yii
+RUN /usr/bin/crontab /etc/cron.d/yii
+RUN touch /var/log/cron.log
+CMD /usr/sbin/cron -f
+
+WORKDIR /app

@@ -1,21 +1,58 @@
 version: '3'
-
 services:
-###> doctrine/doctrine-bundle ###
-  database:
-    image: postgres:${POSTGRES_VERSION:-15}-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-app}
-      # You should definitely change the password in production
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
-      POSTGRES_USER: ${POSTGRES_USER:-app}
+  nginx:
+    build:
+      context: ./docker
+      dockerfile: nginx.docker
     volumes:
-      - database_data:/var/lib/postgresql/data:rw
-      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
-      # - ./docker/db/data:/var/lib/postgresql/data:rw
-###< doctrine/doctrine-bundle ###
+      - ./:/app
+    depends_on:
+      - php-fpm
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8080:80"
+  php-fpm:
+    build:
+      context: ./docker
+      dockerfile: php-fpm.docker
+    volumes:
+      - ./:/app
+    depends_on:
+      - mariadb
+  php-cli:
+    build:
+      context: ./docker
+      dockerfile: php-cli.docker
+    volumes:
+      - ./:/app
+      - vol-composer:/root/.composer/cache
+    depends_on:
+      - mariadb
+    tty: true
+  mariadb:
+    image: mariadb:10.10
+    restart: 'always'
+    environment:
+      - MYSQL_ROOT_PASSWORD=magxuT0ifPhLb7BT
+      - MYSQL_DATABASE=analytics_viewer
+      - MYSQL_USER=analytics_viewer
+      - MYSQL_PASSWORD=EHBNNoMIQOj2r2Fy
+    ports:
+      - "33061:3306"
+    healthcheck:
+      test: [ "CMD", "mysqladmin" ,"ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+  node:
+    image: node:19-alpine
+    volumes:
+      - ./:/app
+    working_dir: /app
+  mailer:
+    image: schickling/mailcatcher
+    ports: ["1025", "1080"]
 
 volumes:
-###> doctrine/doctrine-bundle ###
-  database_data:
-###< doctrine/doctrine-bundle ###
+  vol-composer:
